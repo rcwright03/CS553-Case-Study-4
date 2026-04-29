@@ -1,23 +1,6 @@
 import gradio as gr
-import requests
-import prometheus_client
 from time import perf_counter
-
-BACKEND_URL = 'http://backend:8000'
-
-
-FRONTEND_CHAT_REQUESTS_TOTAL = prometheus_client.Counter(
-    'frontend_requests_total',
-    'Total number of requests',
-)
-FRONTEND_CHAT_REQUESTS_ERRORS_TOTAL = prometheus_client.Counter(
-    'frontend_requests_errors_total',
-    'Total number of errors',
-)
-FRONTEND_CHAT_REQUESTS_DURATION_SECONDS = prometheus_client.Histogram(
-    'frontend_requests_duration_seconds',
-    'Duration of frontend chat requests in seconds'
-)
+from backend import generate
 
 def respond(
         message,
@@ -29,14 +12,6 @@ def respond(
         use_local_model,
         hf_token=None
 ):
-    FRONTEND_CHAT_REQUESTS_TOTAL.inc()
-    started = perf_counter()
-    message = message.strip()
-
-    if not message:
-        FRONTEND_CHAT_REQUESTS_ERRORS_TOTAL.inc()
-        FRONTEND_CHAT_REQUESTS_DURATION_SECONDS.observe(perf_counter() - started)
-        return '<p>Please enter a message.</p>'
 
     payload = {
         "prompt": message,
@@ -44,30 +19,15 @@ def respond(
         "max_tokens": max_tokens,
         "temp": temp,
         "top_p": top_p,
-        "use_local_model": use_local_model,
-        "hf_token": hf_token
     }
-
-    try:
         # post to appropriate server (local always works during development)
-        #url = LOCAL_URL if use_local_model else BASE_URL
+    #url = LOCAL_URL if use_local_model else BASE_URL
+    response = generate(payload)
+    response.raise_for_status()
+    result = response.json()
+    return result.get("response", f"No 'response' field returned: {result}")
 
-        response = requests.post(f"{BACKEND_URL}/generate", json=payload, timeout=300)
-        response.raise_for_status()
-        result = response.json()
-        return result.get("response", f"No 'response' field returned: {result}")
-        
-    except requests.RequestException as exc:
-        FRONTEND_CHAT_REQUESTS_ERRORS_TOTAL.inc()
-        return f'<p>Backend request failed: {exc}</p>'
 
-    except ValueError:
-        FRONTEND_CHAT_REQUESTS_ERRORS_TOTAL.inc()
-        return "Backend returned invalid JSON."
-    finally:
-        FRONTEND_CHAT_REQUESTS_DURATION_SECONDS.observe(perf_counter() - started)
-
-prometheus_client.start_http_server(9090)
 chatbot = gr.ChatInterface(
     respond,
     additional_inputs=[
