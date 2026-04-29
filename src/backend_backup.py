@@ -1,3 +1,6 @@
+### OLD VERSION OF THE BACKEND FROM CASE STUDY 3
+
+
 from fastapi import FastAPI, status, HTTPException, Response
 from typing import List, Optional
 from pydantic import BaseModel
