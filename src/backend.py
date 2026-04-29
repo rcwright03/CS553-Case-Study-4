@@ -2,21 +2,11 @@ from fastapi import FastAPI, status, HTTPException, Response
 from typing import List, Optional
 from pydantic import BaseModel
 from huggingface_hub import InferenceClient
-import prometheus_client
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 import logging
 from time import perf_counter
-
-class GenerateRequest(BaseModel):
-    prompt: str
-    system_message: str
-    max_tokens: int = 200
-    temp: float = 0.7
-    top_p: float = 0.9
-    use_local_model: bool = False
-    hf_token: Optional[str] = None
 
 # Creating example inputs and outputs for few shot learning
 EXAMPLE_INPUT_1 = 'Make me lyrics and chords for a song in the style of Simon and Garfunkel about sitting through a computer science lecture'
@@ -154,13 +144,3 @@ def generate(payload: dict) -> str:
     messages = build_messages(payload)
     return generate_remote(messages, payload)
     
-# def generate_endpoint(body: GenerateRequest):
-#     try:
-#         song = generate(body)
-#         return GenerateResponse(
-#             response=song
-#         )
-#     except Exception as e:
-#         logging.error(f"Generation error: {e}", exc_info=True)
-#         raise
-
