@@ -4,9 +4,9 @@ RUN pip install --no-cache-dir gradio huggingface_hub
 
 WORKDIR /app
 
-COPY src/frontend.py /app/src/
-COPY src/backend.py /app/src/
+COPY src/frontend_azure.py /app/
+COPY src/backend_azure.py /app/
 
 EXPOSE 7860
 
-CMD ["python", "src/frontend.py"]
+CMD ["python", "frontend_azure.py"]

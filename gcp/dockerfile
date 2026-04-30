@@ -4,9 +4,9 @@ RUN pip install --no-cache-dir gradio huggingface_hub
 
 WORKDIR /app
 
-COPY src/frontend.py /app/src/
-COPY src/backend.py /app/src/
+COPY src/frontend_gcp.py /app/
+COPY src/backend_gcp.py /app/
 
 EXPOSE 7860
 
-CMD ["python", "src/frontend.py"]
+CMD ["python", "frontend_gcp.py"]
