@@ -1,3 +1,6 @@
+### OLD VERSION OF THE FRONTEND FROM CASE STUDY 3
+
+
 import gradio as gr
 import requests
 import prometheus_client

@@ -2,57 +2,11 @@ from fastapi import FastAPI, status, HTTPException, Response
 from typing import List, Optional
 from pydantic import BaseModel
 from huggingface_hub import InferenceClient
-import prometheus_client
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 import logging
 from time import perf_counter
-
-# prometheus metrics
-HEALTH_REQUESTS_TOTAL = prometheus_client.Counter(
-    'backend_health_requests_total',
-    'Total num of /health requests received by the backend'
-)
-SONG_REQUESTS_TOTAL = prometheus_client.Counter(
-    'backend_song_requests_total',
-    'Total number of /generate requests'
-)
-SONG_REQUEST_ERRORS_TOTAL = prometheus_client.Counter(
-    'backend_song_request_errors_total',
-    'Total number of failed /song requests'
-)
-SONG_REQUEST_DURATION_SECONDS = prometheus_client.Histogram(
-    'backend_song_request_duration_seconds',
-    'Time spent generating song responses'
-)
-
-# song app
-song_app = FastAPI(title="Songbird API")
-
-# environment
-HF_TOKEN = os.getenv("HF_TOKEN")
-if HF_TOKEN is None:
-    logging.warning("HF_TOKEN is not set.")
-else:
-    logging.info("HF_TOKEN loaded.")
-
-@song_app.get("/health")
-def health() -> dict[str, str]:
-    HEALTH_REQUESTS_TOTAL.inc()
-    return {'status': 'ok'}
-
-# request/response models
-pipe = None
-
-class GenerateRequest(BaseModel):
-    prompt: str
-    system_message: str
-    max_tokens: int = 200
-    temp: float = 0.7
-    top_p: float = 0.9
-    use_local_model: bool = False
-    hf_token: Optional[str] = None
 
 # Creating example inputs and outputs for few shot learning
 EXAMPLE_INPUT_1 = 'Make me lyrics and chords for a song in the style of Simon and Garfunkel about sitting through a computer science lecture'
@@ -151,9 +105,9 @@ class GenerateResponse(BaseModel):
     response: str
 
 # build prompts
-def build_messages(req: GenerateRequest) -> list[dict]:
+def build_messages(payload: dict) -> list[dict]:
     messages = [
-        {"role": "system", "content": req.system_message}
+        {"role": "system", "content": payload["system_message"]}
     ]
 
     # add few shot learning examples
@@ -162,60 +116,21 @@ def build_messages(req: GenerateRequest) -> list[dict]:
         messages.append({"role": "assistant", "content": example["output"]})
 
     # add user prompt
-    messages.append({"role": "user", "content": req.prompt})
+    messages.append({"role": "user", "content": payload["prompt"]})
     return messages
 
-# local model
-def generate_local(messages: list[dict], req: GenerateRequest) -> str:
-    global pipe
-
-    try:
-        from transformers import pipeline
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Local model import failed: {str(e)[:200]}",
-        )
-
-    if pipe is None:
-        pipe = pipeline(
-            "text-generation",
-            model="LiquidAI/LFM2-350M",
-        )
-
-    prompt = "".join([f"{m['role']}: {m['content']}\n" for m in messages])
-
-    outputs = pipe(
-        prompt,
-        max_new_tokens=req.max_tokens,
-        do_sample=True,
-        temperature=req.temp,
-        top_p=req.top_p,
-    )
-
-    return outputs[0]["generated_text"][len(prompt):].strip()
-
 # remote model generation
-def generate_remote(messages: list[dict], req: GenerateRequest) -> str:
-    token = req.hf_token or HF_TOKEN
-
-    if token is None:
-        raise HTTPException(
-            status_code=400,
-            detail="HF token required for remote model",
-        )
-
+def generate_remote(messages: list[dict], payload: dict) -> str:
     client = InferenceClient(
-        token=token,
         model="openai/gpt-oss-20b",
     )
 
     try:
         completion = client.chat_completion(
             messages,
-            max_tokens=req.max_tokens,
-            temperature=req.temp,
-            top_p=req.top_p,
+            max_tokens=payload["max_tokens"],
+            temperature=payload["temp"],
+            top_p=payload["top_p"],
         )
         return completion.choices[0].message.content
     except Exception as e:
@@ -225,38 +140,7 @@ def generate_remote(messages: list[dict], req: GenerateRequest) -> str:
         )
     
 # generation function
-def generate(req: GenerateRequest) -> str:
-    messages = build_messages(req)
-
-    if req.use_local_model:
-        return generate_local(messages, req)
-    else:
-        return generate_remote(messages, req)
+def generate(payload: dict) -> str:
+    messages = build_messages(payload)
+    return generate_remote(messages, payload)
     
-@song_app.get('/health')
-def health():
-    return {"status": "ok"}
-
-@song_app.post('/generate', response_model=GenerateResponse)
-def generate_endpoint(body: GenerateRequest):
-    SONG_REQUESTS_TOTAL.inc()
-    start = perf_counter()
-
-    try:
-        song = generate(body)
-        return GenerateResponse(
-            response=song
-        )
-    except Exception as e:
-        SONG_REQUEST_ERRORS_TOTAL.inc()
-        logging.error(f"Generation error: {e}", exc_info=True)
-        raise
-    finally:
-        SONG_REQUEST_DURATION_SECONDS.observe(perf_counter() - start)
-
-@song_app.get("/metrics")
-def metrics():
-    return Response(
-        prometheus_client.generate_latest(),
-        media_type=prometheus_client.CONTENT_TYPE_LATEST,
-    )
