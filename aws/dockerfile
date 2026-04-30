@@ -4,8 +4,8 @@ RUN pip install --no-cache-dir gradio huggingface_hub
 
 WORKDIR /app
 
-COPY src/frontend_aws.py /app/
-COPY src/backend_aws.py /app/
+COPY frontend_aws.py /app/
+COPY backend_aws.py /app/
 
 EXPOSE 7860
 
