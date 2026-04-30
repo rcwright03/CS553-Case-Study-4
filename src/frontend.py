@@ -2,8 +2,14 @@ import gradio as gr
 import requests
 import prometheus_client
 from time import perf_counter
+import os
 
-BACKEND_URL = 'http://backend:8000'
+# Cloud Run sets $PORT; fall back to 7860 for local / docker-compose
+PORT = int(os.getenv("PORT", 7860))
+
+# Cloud Run backend service URL injected at deploy time;
+# falls back to the docker-compose service name for local dev
+BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")
 
 
 FRONTEND_CHAT_REQUESTS_TOTAL = prometheus_client.Counter(
@@ -49,14 +55,11 @@ def respond(
     }
 
     try:
-        # post to appropriate server (local always works during development)
-        #url = LOCAL_URL if use_local_model else BASE_URL
-
         response = requests.post(f"{BACKEND_URL}/generate", json=payload, timeout=300)
         response.raise_for_status()
         result = response.json()
         return result.get("response", f"No 'response' field returned: {result}")
-        
+
     except requests.RequestException as exc:
         FRONTEND_CHAT_REQUESTS_ERRORS_TOTAL.inc()
         return f'<p>Backend request failed: {exc}</p>'
@@ -67,13 +70,17 @@ def respond(
     finally:
         FRONTEND_CHAT_REQUESTS_DURATION_SECONDS.observe(perf_counter() - started)
 
+# Prometheus sidecar — internal only on Cloud Run (port 9090 is not exposed)
 prometheus_client.start_http_server(9090)
+
 chatbot = gr.ChatInterface(
     respond,
     additional_inputs=[
-        gr.Textbox(value="You are a professional Songwriter and Lyricist." \
-        " Your goal is to write lyrics that have a strong rhythm, clear structure, and creative rhymes.",
-        label="System message"),
+        gr.Textbox(
+            value="You are a professional Songwriter and Lyricist."
+                  " Your goal is to write lyrics that have a strong rhythm, clear structure, and creative rhymes.",
+            label="System message"
+        ),
         gr.Slider(minimum=1, maximum=2048, value=512, step=1, label="Max new tokens"),
         gr.Slider(minimum=0.1, maximum=2.0, value=0.7, step=0.1, label="Temperature"),
         gr.Slider(minimum=0.1, maximum=1.0, value=0.95, step=0.05, label="Top-p (nucleus sampling)"),
@@ -86,4 +93,5 @@ with gr.Blocks() as demo:
         gr.Markdown("<h1 style='text-align: center;'> 🎵 Song Generator Chatbot 🎵</h1>")
     chatbot.render()
 
-demo.launch(server_name="0.0.0.0")
+# Cloud Run injects $PORT; fall back to 7860 for local dev
+demo.launch(server_name="0.0.0.0", server_port=PORT)
