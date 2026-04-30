@@ -1,0 +1,17 @@
+FROM python:3.13.5-slim
+
+RUN pip install --no-cache-dir \
+    gradio \
+    huggingface_hub \
+    fastapi \
+    pydantic \
+    python-dotenv
+
+WORKDIR /app
+
+COPY frontend_gcp.py /app/
+COPY backend_gcp.py /app/
+
+EXPOSE 7860
+
+CMD ["python", "frontend_gcp.py"]
