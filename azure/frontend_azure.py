@@ -1,6 +1,6 @@
 import gradio as gr
 from time import perf_counter
-from backend import generate
+from azure.backend_azure import generate
 
 def respond(
         message,
@@ -9,8 +9,6 @@ def respond(
         max_tokens,
         temp,
         top_p,
-        use_local_model,
-        hf_token=None
 ):
 
     payload = {
