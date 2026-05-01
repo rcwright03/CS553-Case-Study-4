@@ -1,12 +1,8 @@
-from fastapi import FastAPI, status, HTTPException, Response
-from typing import List, Optional
+from fastapi import HTTPException
 from pydantic import BaseModel
-from huggingface_hub import InferenceClient
 import os
-from pathlib import Path
-from dotenv import load_dotenv
-import logging
-from time import perf_counter
+from huggingface_hub import InferenceClient
+
 
 # Creating example inputs and outputs for few shot learning
 EXAMPLE_INPUT_1 = 'Make me lyrics and chords for a song in the style of Simon and Garfunkel about sitting through a computer science lecture'
@@ -119,12 +115,13 @@ def build_messages(payload: dict) -> list[dict]:
     messages.append({"role": "user", "content": payload["prompt"]})
     return messages
 
+
 # remote model generation
 def generate_remote(messages: list[dict], payload: dict) -> str:
     client = InferenceClient(
         model="openai/gpt-oss-20b",
+        api_key=os.getenv("hftoken"),   
     )
-
     try:
         completion = client.chat_completion(
             messages,
@@ -143,4 +140,3 @@ def generate_remote(messages: list[dict], payload: dict) -> str:
 def generate(payload: dict) -> str:
     messages = build_messages(payload)
     return generate_remote(messages, payload)
-    

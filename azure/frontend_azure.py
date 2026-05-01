@@ -1,6 +1,6 @@
 import gradio as gr
 from time import perf_counter
-from azure.backend_azure import generate
+from backend_azure import generate
 
 def respond(
         message,
@@ -9,6 +9,7 @@ def respond(
         max_tokens,
         temp,
         top_p,
+        hftoken
 ):
 
     payload = {
@@ -18,12 +19,7 @@ def respond(
         "temp": temp,
         "top_p": top_p,
     }
-        # post to appropriate server (local always works during development)
-    #url = LOCAL_URL if use_local_model else BASE_URL
-    response = generate(payload)
-    response.raise_for_status()
-    result = response.json()
-    return result.get("response", f"No 'response' field returned: {result}")
+    return generate(payload)
 
 
 chatbot = gr.ChatInterface(
