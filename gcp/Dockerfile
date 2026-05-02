@@ -1,6 +1,11 @@
 FROM python:3.13.5-slim
 
-RUN pip install --no-cache-dir gradio huggingface_hub
+RUN pip install --no-cache-dir \
+    gradio \
+    huggingface_hub \
+    fastapi \
+    pydantic \
+    python-dotenv
 
 WORKDIR /app
 

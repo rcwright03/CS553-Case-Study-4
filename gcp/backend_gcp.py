@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import logging
 from time import perf_counter
 
+HF_TOKEN = os.getenv("HF_TOKEN")
 # Creating example inputs and outputs for few shot learning
 EXAMPLE_INPUT_1 = 'Make me lyrics and chords for a song in the style of Simon and Garfunkel about sitting through a computer science lecture'
 EXAMPLE_OUTPUT_1 = """
@@ -122,6 +123,7 @@ def build_messages(payload: dict) -> list[dict]:
 # remote model generation
 def generate_remote(messages: list[dict], payload: dict) -> str:
     client = InferenceClient(
+        token=HF_TOKEN,
         model="openai/gpt-oss-20b",
     )
 
